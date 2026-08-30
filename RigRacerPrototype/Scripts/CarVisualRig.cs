@@ -116,7 +116,15 @@ public class CarVisualRig : MonoBehaviour
                 t = cyl.transform;
             }
             Collider col = t.GetComponent<Collider>();
-            if (col != null) Destroy(col);
+            if (col != null)
+            {
+#if UNITY_EDITOR
+                if (!Application.isPlaying) DestroyImmediate(col);
+                else Destroy(col);
+#else
+                Destroy(col);
+#endif
+            }
         }
         UpdateWheelTransparency();
     }
