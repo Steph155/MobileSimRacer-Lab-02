@@ -107,7 +107,7 @@ public class CarController : MonoBehaviour
         float uprightHalf = (rig.fUpperLeftFrontMount.y - rig.fLowerLeftFrontMount.y) * 0.5f;
         // Equilibrium body height so the wheel rests exactly on the ground.
         float bodyEq = -springTopLocalY + (springFreeLength - compEq) - uprightHalf + rig.frontWheelRadius;
-        if (spawnPosition.y < bodyEq + 0.02f) spawnPosition.y = bodyEq + 0.06f;
+        spawnPosition.y = bodyEq + 0.06f; // gentle drop within travel (never spawn metres up)
 
         ResetToSpawn();
     }
@@ -191,7 +191,8 @@ public class CarController : MonoBehaviour
 
             // Outer ball joints sit OUTBOARD at the wheel (track width). The A-arm
             // links them to the inboard inner mounts; the spring perch is tight & inboard.
-            Vector3 lowerBallLocal = new Vector3(side * trackW * 0.5f, iLF.y, axleZ);
+            Vector3 lowerBallLocal = isLeft ? (isFront ? rig.fOuterLeftLowerMount : rig.rOuterLeftLowerMount)
+                                            : (isFront ? rig.fOuterRightLowerMount : rig.rOuterRightLowerMount);
             Vector3 springTopLocal = new Vector3(side * trackW * 0.5f, springTopLocalY, axleZ);
 
             Vector3 pivotFrontW = position + orientation * iLF;

@@ -39,7 +39,7 @@ public class CarVisualRig : MonoBehaviour
     public float frontWheelWidth = 0.28f;
     public float rearWheelRadius = 0.355f;
     public float rearWheelWidth = 0.375f;
-    [Range(0.05f, 1f)] public float wheelOpacity = 0.4f;
+    [Range(0.05f, 1f)] public float wheelOpacity = 0.6f;
 
     [Header("Ride Heights & Positioning")]
     [Tooltip("Reference resting offset. Real ride height is solved by the suspension.")]
@@ -124,6 +124,11 @@ public class CarVisualRig : MonoBehaviour
             rUpperRightRearMount = new Vector3(-rUpperLeftRearMount.x, rUpperLeftRearMount.y, rUpperLeftRearMount.z);
             rLowerRightFrontMount = new Vector3(-rLowerLeftFrontMount.x, rLowerLeftFrontMount.y, rLowerLeftFrontMount.z);
             rLowerRightRearMount = new Vector3(-rLowerLeftRearMount.x, rLowerLeftRearMount.y, rLowerLeftRearMount.z);
+
+            fOuterRightUpperMount = new Vector3(-fOuterLeftUpperMount.x, fOuterLeftUpperMount.y, fOuterLeftUpperMount.z);
+            fOuterRightLowerMount = new Vector3(-fOuterLeftLowerMount.x, fOuterLeftLowerMount.y, fOuterLeftLowerMount.z);
+            rOuterRightUpperMount = new Vector3(-rOuterLeftUpperMount.x, rOuterLeftUpperMount.y, rOuterLeftUpperMount.z);
+            rOuterRightLowerMount = new Vector3(-rOuterLeftLowerMount.x, rOuterLeftLowerMount.y, rOuterLeftLowerMount.z);
         }
         UpdateWheelTransparency();
     }
@@ -233,18 +238,33 @@ public class CarVisualRig : MonoBehaviour
         CornerGeometry g;
         g.innerUpperFront = wUF; g.innerUpperRear = wUR;
         g.innerLowerFront = wLF; g.innerLowerRear = wLR;
-        // Outer ball joints sit OUTBOARD at the wheel (track width), linked to the
-        // inboard inner mounts by the A-arms. This is what makes a real wishbone.
-        float trackW = isFront ? frontTrackWidth : rearTrackWidth;
-        float axleZ = isFront ? frontWheelBaseZ : rearWheelBaseZ;
-        float upperY = wUF.y;
-        float lowerY = wLF.y;
-        float sx = isLeft ? -1f : 1f;
-        g.outerUpper = transform.TransformPoint(new Vector3(sx * trackW * 0.5f, upperY, axleZ));
-        g.outerLower = transform.TransformPoint(new Vector3(sx * trackW * 0.5f, lowerY, axleZ));
+        // Outer ball joints are now EDITABLE fields (at the wheels).
+        Vector3 oU = isLeft ? (isFront ? fOuterLeftUpperMount : rOuterLeftUpperMount)
+                            : (isFront ? fOuterRightUpperMount : rOuterRightUpperMount);
+        Vector3 oL = isLeft ? (isFront ? fOuterLeftLowerMount : rOuterLeftLowerMount)
+                            : (isFront ? fOuterRightLowerMount : rOuterRightLowerMount);
+        g.outerUpper = transform.TransformPoint(oU);
+        g.outerLower = transform.TransformPoint(oL);
         g.upperPivotAxis = (wUR - wUF).normalized;
         g.lowerPivotAxis = (wLR - wLF).normalized;
         return g;
+    }
+
+    private void DrawSpring(Vector3 a, Vector3 b)
+    {
+        Gizmos.color = Color.cyan;
+        int n = 12;
+        Vector3 dir = (b - a).normalized;
+        Vector3 perp = Vector3.Cross(dir, Vector3.up);
+        if (perp.magnitude < 0.01f) perp = Vector3.Cross(dir, Vector3.forward);
+        perp.Normalize();
+        for (int i = 0; i < n; i++)
+        {
+            float t0 = i / (float)n, t1 = (i + 1) / (float)n;
+            float o0 = (i % 2 == 0 ? 0.05f : -0.05f);
+            float o1 = (i % 2 == 0 ? -0.05f : 0.05f);
+            Gizmos.DrawLine(Vector3.Lerp(a, b, t0) + perp * o0, Vector3.Lerp(a, b, t1) + perp * o1);
+        }
     }
 
     private void OnDrawGizmos()
@@ -288,6 +308,11 @@ public class CarVisualRig : MonoBehaviour
 
             // Upright link between the two outer joints.
             Gizmos.DrawLine(g.outerUpper, g.outerLower);
+
+            // Visible coilover spring (cyan) from lower ball joint up to chassis perch.
+            float axleZs = isFront ? frontWheelBaseZ : rearWheelBaseZ;
+            Vector3 perch = transform.TransformPoint(new Vector3(g.outerLower.x, springPerchLocalY, axleZs));
+            DrawSpring(g.outerLower, perch);
 
             // Arc motion of each double-wishbone arm as the suspension travels.
             float comp = drivenByController ? liveCompression[i] : suspensionPreview;
