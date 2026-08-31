@@ -34,6 +34,19 @@ public class CarVisualRig : MonoBehaviour
     public Vector3 rLowerRightFrontMount = new Vector3(0.4f, -0.2f, -0.1f);
     public Vector3 rLowerRightRearMount = new Vector3(0.4f, -0.2f, -0.7f);
 
+    [Header("8 Outer Wishbone Mounts (EDITABLE - at the wheels)")]
+    public Vector3 fOuterLeftUpperMount  = new Vector3(-0.95f, 0.15f, 0.4f);
+    public Vector3 fOuterLeftLowerMount  = new Vector3(-0.95f, -0.2f, 0.4f);
+    public Vector3 fOuterRightUpperMount = new Vector3(0.95f, 0.15f, 0.4f);
+    public Vector3 fOuterRightLowerMount = new Vector3(0.95f, -0.2f, 0.4f);
+    public Vector3 rOuterLeftUpperMount  = new Vector3(-0.925f, 0.15f, -0.4f);
+    public Vector3 rOuterLeftLowerMount  = new Vector3(-0.925f, -0.2f, -0.4f);
+    public Vector3 rOuterRightUpperMount = new Vector3(0.925f, 0.15f, -0.4f);
+    public Vector3 rOuterRightLowerMount = new Vector3(0.925f, -0.2f, -0.4f);
+
+    [Header("Spring perch (chassis coilover top)")]
+    public float springPerchLocalY = 0.1f;
+
     [Header("Tyre & Wheel Configuration")]
     public float frontWheelRadius = 0.3525f;
     public float frontWheelWidth = 0.28f;
