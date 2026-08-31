@@ -78,6 +78,32 @@ public class CarVisualRig : MonoBehaviour
     void Awake()
     {
         InitializeWheels();
+        InitializeBody();
+    }
+
+    // Visible chassis tub (the gizmo only draws a wireframe; without this the car
+    // looks like floating wheels). Visual only - no collider, so it never blocks
+    // the suspension raycast.
+    void InitializeBody()
+    {
+        Transform b = transform.Find("ChassisBody");
+        if (b == null)
+        {
+            GameObject cube = GameObject.CreatePrimitive(PrimitiveType.Cube);
+            cube.name = "ChassisBody";
+            cube.transform.SetParent(transform);
+            b = cube.transform;
+        }
+        b.localPosition = Vector3.zero;
+        b.localRotation = Quaternion.identity;
+        b.localScale = chassisSize;
+        Collider col = b.GetComponent<Collider>();
+        if (col != null) Destroy(col);
+        Renderer r = b.GetComponent<Renderer>();
+        if (r != null && (r.sharedMaterial == null || r.sharedMaterial.name == "Default-Material"))
+        {
+            r.sharedMaterial = new Material(Shader.Find("Standard")) { color = new Color(0.18f, 0.18f, 0.22f) };
+        }
     }
 
     void Update()
