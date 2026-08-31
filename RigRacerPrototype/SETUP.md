@@ -123,3 +123,17 @@ Use `CarVisualRig.suspensionPreview` (0..1) to scrub the arc in Edit mode, and
 3. **Kerb / obstacle testing** on PC with recorded inputs, then port the exact
    fixed-step loop to mobile (same `fixedStep`, same initial state).
 4. Mobile input layer (touch steering/throttle) feeding the same `CarInput`.
+
+## 9. Camera (follow the car)
+
+The prototype has no built-in camera, so add a chase camera:
+
+1. Select the scene's **Main Camera** (or create one: GameObject → Camera).
+2. Add the **CarChaseCamera** component to it.
+3. Set `CarChaseCamera.target` to the **Car** (it also auto-finds the
+   CarController if left empty).
+4. Tune in the Inspector: `distance` (behind), `height` (above),
+   `lookAhead`, and `positionLerp`/`lookLerp` (smoothing). The camera rises
+   slightly with speed and stays above the ground plane.
+
+It runs in `LateUpdate` so it sits behind the car's physics each frame.
