@@ -32,7 +32,7 @@ public class CarController : MonoBehaviour
 
     [Header("World")]
     public LayerMask groundMask = -1;
-    public Vector3 spawnPosition = new Vector3(0f, 2.2f, 0f);
+    public Vector3 spawnPosition = new Vector3(0f, 1.0f, 0f); // ~0.35m drop: gentle enough for the 10cm travel
 
     [Header("Brakes")]
     public float maxBrakeTorque = 1600f;
@@ -164,13 +164,19 @@ public class CarController : MonoBehaviour
             bool isLeft = (c % 2 == 0);
             SuspensionParams sp = isFront ? frontSusp : rearSusp;
             TyreParams tp = isFront ? frontTyre : rearTyre;
-            CarVisualRig.CornerGeometry geo = rig.GetCornerGeometry(c);
-            Vector3 anchor = geo.outerLower; // lower ball joint = spring top
+            // Anchor uses the CONFIGURABLE track width (not the fixed mount X),
+            // and is built from the live physics state so it never lags behind
+            // the transform.
+            float trackW = isFront ? rig.frontTrackWidth : rig.rearTrackWidth;
+            float axleZ = isFront ? rig.frontWheelBaseZ : rig.rearWheelBaseZ;
+            float lowerY = isFront ? rig.fLowerLeftFrontMount.y : rig.rLowerLeftFrontMount.y;
+            Vector3 anchorLocal = new Vector3((isLeft ? -1f : 1f) * trackW * 0.5f, lowerY, axleZ);
+            Vector3 anchor = position + orientation * anchorLocal;
             float radius = isFront ? rig.frontWheelRadius : rig.rearWheelRadius;
 
             Vector3 down = -up;
             Ray ray = new Ray(anchor, down);
-            float maxDist = sp.restLength + sp.maxTravel + 0.25f;
+            float maxDist = sp.restLength + sp.maxTravel + 3f; // generous so it never misses
             bool hit = Physics.Raycast(ray, out RaycastHit hitInfo, maxDist, groundMask);
 
             WheelStep w = new WheelStep();
@@ -313,6 +319,10 @@ public class CarController : MonoBehaviour
         orientation = VehicleMath.Integrate(orientation, bodyOmega, dt);
 
         speedKph = Mathf.Abs(Vector3.Dot(velocity, orientation * Vector3.forward)) * 3.6f;
+
+        // Safety net: if the car ever ends up far below the ground (e.g. raycast
+        // missed), recover instead of falling forever.
+        if (position.y < -1f) { ResetToSpawn(); return; }
 
         // store compression for gizmos
         for (int c = 0; c < 4; c++)

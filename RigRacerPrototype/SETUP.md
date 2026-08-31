@@ -72,6 +72,12 @@ stops, anti-ackermann front steering, camber/toe reflection, and a telemetry HUD
 (gear shows `R`); **S** then drives backward and **W** brakes. Hold **W** while
 stopped in Reverse to return to forward drive.
 
+## 5b. Track width is respected at runtime
+
+`CarController` places each wheel at `±trackWidth/2` (front/rear configurable), so changing
+`frontTrackWidth`/`rearTrackWidth` on the rig spreads the wheels correctly during play
+(previously the wheels were pinned to the fixed mount X). Editable live in the Inspector.
+
 ## 5. Editor rig visualization
 
 Select the Car and look in the Scene view:
