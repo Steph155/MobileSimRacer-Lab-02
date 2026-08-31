@@ -207,9 +207,15 @@ public class CarVisualRig : MonoBehaviour
         CornerGeometry g;
         g.innerUpperFront = wUF; g.innerUpperRear = wUR;
         g.innerLowerFront = wLF; g.innerLowerRear = wLR;
-        // Outer ball joint approximated as midpoint of the two arms' free ends.
-        g.outerUpper = (wUF + wUR) * 0.5f;
-        g.outerLower = (wLF + wLR) * 0.5f;
+        // Outer ball joints sit OUTBOARD at the wheel (track width), linked to the
+        // inboard inner mounts by the A-arms. This is what makes a real wishbone.
+        float trackW = isFront ? frontTrackWidth : rearTrackWidth;
+        float axleZ = isFront ? frontWheelBaseZ : rearWheelBaseZ;
+        float upperY = wUF.y;
+        float lowerY = wLF.y;
+        float sx = isLeft ? -1f : 1f;
+        g.outerUpper = transform.TransformPoint(new Vector3(sx * trackW * 0.5f, upperY, axleZ));
+        g.outerLower = transform.TransformPoint(new Vector3(sx * trackW * 0.5f, lowerY, axleZ));
         g.upperPivotAxis = (wUR - wUF).normalized;
         g.lowerPivotAxis = (wLR - wLF).normalized;
         return g;

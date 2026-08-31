@@ -67,10 +67,16 @@ public class CarController : MonoBehaviour
     System.Collections.Generic.List<CarInput> recorded = new System.Collections.Generic.List<CarInput>();
     int playbackIndex = 0;
 
+    // Tight double-wishbone coilover: the chassis perch sits close to the lower
+    // ball joint (a fraction of the chassis height), not a long 0.5m raycast spring.
+    public float springTopLocalY = -0.05f;
+    float springFreeLength = 0.18f;
+
     // per-step scratch
     struct WheelStep
     {
         public Vector3 contact;
+        public Vector3 center;   // kinematic wheel centre (wishbone arc)
         public Vector3 anchor;
         public float currentLength;
         public float radius;
@@ -93,6 +99,15 @@ public class CarController : MonoBehaviour
         float iz = mass / 12f * (s.x * s.x + s.y * s.y);
         inertia = new Vector3(ix, iy, iz);
         invInertia = new Vector3(1f / ix, 1f / iy, 1f / iz);
+
+        // Size the tight coilover so ride height is automatic and the spawn drop is
+        // within the 10 cm travel (no slam -> no bounce/launch).
+        float compEq = mass * VehicleMath.Gravity / (4f * frontSusp.cornerSpringK);
+        springFreeLength = compEq + 0.15f; // tight free length (~0.20 m)
+        float uprightHalf = (rig.fUpperLeftFrontMount.y - rig.fLowerLeftFrontMount.y) * 0.5f;
+        // Equilibrium body height so the wheel rests exactly on the ground.
+        float bodyEq = -springTopLocalY + (springFreeLength - compEq) - uprightHalf + frontWheelRadius;
+        if (spawnPosition.y < bodyEq + 0.02f) spawnPosition.y = bodyEq + 0.06f;
 
         ResetToSpawn();
     }
@@ -162,50 +177,79 @@ public class CarController : MonoBehaviour
         {
             bool isFront = c < 2;
             bool isLeft = (c % 2 == 0);
+            int side = isLeft ? -1 : 1;
             SuspensionParams sp = isFront ? frontSusp : rearSusp;
-            TyreParams tp = isFront ? frontTyre : rearTyre;
-            // Anchor uses the CONFIGURABLE track width (not the fixed mount X),
-            // and is built from the live physics state so it never lags behind
-            // the transform.
             float trackW = isFront ? rig.frontTrackWidth : rig.rearTrackWidth;
             float axleZ = isFront ? rig.frontWheelBaseZ : rig.rearWheelBaseZ;
-            float lowerY = isFront ? rig.fLowerLeftFrontMount.y : rig.rLowerLeftFrontMount.y;
-            Vector3 anchorLocal = new Vector3((isLeft ? -1f : 1f) * trackW * 0.5f, lowerY, axleZ);
-            Vector3 anchor = position + orientation * anchorLocal;
             float radius = isFront ? rig.frontWheelRadius : rig.rearWheelRadius;
 
-            Vector3 down = -up;
-            Ray ray = new Ray(anchor, down);
-            float maxDist = sp.restLength + sp.maxTravel + 3f; // generous so it never misses
+            // Inboard inner mounts (local) for this corner.
+            Vector3 iLF = isLeft ? (isFront ? rig.fLowerLeftFrontMount : rig.rLowerLeftFrontMount)
+                                  : (isFront ? rig.fLowerRightFrontMount : rig.rLowerRightFrontMount);
+            Vector3 iLR = isLeft ? (isFront ? rig.fLowerLeftRearMount : rig.rLowerLeftRearMount)
+                                  : (isFront ? rig.fLowerRightRearMount : rig.rLowerRightRearMount);
+
+            // Outer ball joints sit OUTBOARD at the wheel (track width). The A-arm
+            // links them to the inboard inner mounts; the spring perch is tight & inboard.
+            Vector3 lowerBallLocal = new Vector3(side * trackW * 0.5f, iLF.y, axleZ);
+            Vector3 springTopLocal = new Vector3(side * trackW * 0.5f, springTopLocalY, axleZ);
+
+            Vector3 pivotFrontW = position + orientation * iLF;
+            Vector3 pivotRearW  = position + orientation * iLR;
+            Vector3 lowerBallDesignW = position + orientation * lowerBallLocal;
+
+            // Short raycast straight down only to locate the ground surface.
+            Vector3 aboveWheel = lowerBallDesignW + up * 0.6f;
+            Ray ray = new Ray(aboveWheel, -up);
+            float maxDist = radius + sp.maxTravel + 0.8f;
             bool hit = Physics.Raycast(ray, out RaycastHit hitInfo, maxDist, groundMask);
 
             WheelStep w = new WheelStep();
-            w.anchor = anchor; w.radius = radius; w.grounded = false;
+            w.radius = radius; w.grounded = false;
+
             if (hit)
             {
-                float currentLength = Mathf.Clamp(hitInfo.distance, sp.restLength - sp.maxTravel, sp.restLength + sp.maxTravel);
-                float comp = sp.restLength - currentLength;
+                Vector3 contact = hitInfo.point;
+                Vector3 wheelCenterGround = contact + up * radius;
+                Vector3 springTopW = position + orientation * springTopLocal;
+                Vector3 attachW = wheelCenterGround - up * 0.175f; // lower spring attach ~ lower ball
+                float springLen = Vector3.Distance(springTopW, attachW);
+
+                // Tight coilover compression, clamped to +/- maxTravel (10 cm).
+                float comp = Mathf.Clamp(springFreeLength - springLen, -sp.maxTravel, sp.maxTravel);
                 float compV = (comp - compression[c]) / dt;
                 float fSpring = sp.cornerSpringK * comp;
                 float fBump = comp > sp.bumpStopStart ? sp.bumpStopK * (comp - sp.bumpStopStart) : 0f;
                 float spd = Mathf.Abs(compV);
-                float t = Mathf.Clamp01(spd / Mathf.Max(sp.highSpeedThreshold, 1e-3f));
-                float damp = compV > 0f
-                    ? Mathf.Lerp(sp.bumpLow, sp.bumpHigh, t)
-                    : Mathf.Lerp(sp.reboundLow, sp.reboundHigh, t);
+                float tt = Mathf.Clamp01(spd / Mathf.Max(sp.highSpeedThreshold, 1e-3f));
+                float damp = compV > 0f ? Mathf.Lerp(sp.bumpLow, sp.bumpHigh, tt)
+                                        : Mathf.Lerp(sp.reboundLow, sp.reboundHigh, tt);
                 float fDamp = -damp * compV;
                 baseForce[c] = fSpring + fBump + fDamp;
                 compression[c] = comp; compressionVel[c] = compV;
-                w.grounded = true; w.currentLength = currentLength; w.contact = hitInfo.point;
+
+                // Rigid wishbone arc: rotate the lower ball joint about the inner
+                // pivot axis (A-arm sweep) so the upright swings in an arc.
+                Vector3 axis = (pivotRearW - pivotFrontW).normalized;
+                Vector3 toBall = lowerBallDesignW - pivotFrontW;
+                float along = Vector3.Dot(toBall, axis);
+                Vector3 perp = toBall - axis * along;
+                float armR = perp.magnitude;
+                float theta = Mathf.Asin(Mathf.Clamp(comp / (side * armR), -1f, 1f));
+                Vector3 rotated = Quaternion.AngleAxis(theta, axis) * perp;
+                Vector3 lowerBallW = pivotFrontW + axis * along + rotated;
+                w.center = lowerBallW + up * 0.175f;
+                w.contact = contact;
+                w.grounded = true;
             }
             else
             {
+                // Airborne: full droop, no spring force.
+                float comp = Mathf.MoveTowards(compression[c], -sp.maxTravel, 0.5f * dt);
+                compression[c] = comp; compressionVel[c] = 0f;
                 baseForce[c] = 0f;
-                // let wheel droop toward rest
-                compression[c] = Mathf.MoveTowards(compression[c], -sp.maxTravel, 0.5f * dt);
-                compressionVel[c] = 0f;
-                w.grounded = false; w.currentLength = sp.restLength;
-                w.contact = anchor + down * sp.restLength;
+                w.center = lowerBallDesignW + up * 0.175f;
+                w.contact = lowerBallDesignW + up * (0.175f - radius);
             }
             ws[c] = w;
         }
@@ -328,7 +372,7 @@ public class CarController : MonoBehaviour
 
         // Safety net: if the car ever ends up far below the ground (e.g. raycast
         // missed), recover instead of falling forever.
-        if (position.y < -1f) { ResetToSpawn(); return; }
+        if (position.y < -5f) { ResetToSpawn(); return; } // true fall-through only
 
         // store compression for gizmos
         for (int c = 0; c < 4; c++)
@@ -404,7 +448,7 @@ public class CarController : MonoBehaviour
             bool isFront = c < 2;
             float radius = isFront ? rig.frontWheelRadius : rig.rearWheelRadius;
             float width = isFront ? rig.frontWheelWidth : rig.rearWheelWidth;
-            Vector3 center = lastWs[c].contact + (orientation * Vector3.up) * radius;
+            Vector3 center = lastWs[c].center;
             wt.position = center;
             Quaternion cylinderFix = Quaternion.Euler(0f, 0f, 90f);
             wt.rotation = orientation * lastWs[c].align * cylinderFix;
