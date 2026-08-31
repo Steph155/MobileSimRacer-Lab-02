@@ -22,8 +22,8 @@ public class CarController : MonoBehaviour
 
     [Header("Determinism")]
     [Tooltip("Fixed physics timestep. The sim only ever advances in these increments.")]
-    public float fixedStep = 1f / 200f;
-    public int maxSubSteps = 8;
+    public float fixedStep = 1f / 240f;
+    public int maxSubSteps = 12;
 
     [Header("Steering / Alignment")]
     public float maxSteerAngle = 32f;     // degrees
@@ -264,7 +264,9 @@ public class CarController : MonoBehaviour
             float Fx = 0f, Fy = 0f;
             if (w.grounded && fz[c] > 1f)
             {
-                float slipRatio = (wheelOmega[c] * w.radius - vLong) / Mathf.Max(Mathf.Abs(vLong), 1f);
+                // Clamp slip: a wheel that free-spun in the air would otherwise produce a
+                // massive instantaneous force on touchdown and launch the car.
+                float slipRatio = Mathf.Clamp((wheelOmega[c] * w.radius - vLong) / Mathf.Max(Mathf.Abs(vLong), 1f), -1.5f, 1.5f);
                 float slipAngle = Mathf.Atan2(-vLat, Mathf.Abs(vLong) + 1e-3f);
                 Fx = VehicleMath.MagicFormula(slipRatio, tp.longB, tp.longC, tp.muX * fz[c], tp.longE);
                 Fy = VehicleMath.MagicFormula(slipAngle, tp.latB, tp.latC, tp.muY * fz[c], tp.latE);
@@ -288,8 +290,12 @@ public class CarController : MonoBehaviour
             float brakeT = cmd.brake * maxBrakeTorque * Mathf.Sign(wheelOmega[c] + 1e-4f);
             float dOmega = (driveTorque - Fx * w.radius - brakeT) / tp.wheelInertia;
             wheelOmega[c] += dOmega * dt;
-            // simple free-wheel bearing drag when airborne
-            if (!w.grounded) wheelOmega[c] *= (1f - Mathf.Min(1f, dt * 0.5f));
+            // simple free-wheel bearing drag when airborne; clamp spin so touchdown slip is bounded
+            if (!w.grounded)
+            {
+                wheelOmega[c] *= (1f - Mathf.Min(1f, dt * 0.5f));
+                wheelOmega[c] = Mathf.Clamp(wheelOmega[c], -250f, 250f);
+            }
 
             ws[c] = w;
         }

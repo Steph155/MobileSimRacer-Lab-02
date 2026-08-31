@@ -150,21 +150,21 @@ public class SuspensionParams
     [Header("Corner spring")]
     public float cornerSpringK = 70000f; // N/m
 
-    [Header("4-way damper (N per m/s)")]
-    public float bumpLow = 2500f;
-    public float bumpHigh = 5000f;
-    public float reboundLow = 2500f;
-    public float reboundHigh = 5000f;
+    [Header("4-way damper (N per m/s) - near-critical for stability")]
+    public float bumpLow = 7000f;
+    public float bumpHigh = 12000f;
+    public float reboundLow = 7000f;
+    public float reboundHigh = 12000f;
     public float highSpeedThreshold = 0.12f; // m/s separates low/high speed
 
-    [Header("Bump stops (progressive)")]
-    public float bumpStopStart = 0.075f;  // compression (m) where stop engages
-    public float bumpStopK = 350000f;     // extra N/m once engaged
+    [Header("Bump stops (progressive, soft enough not to kick")]
+    public float bumpStopStart = 0.07f;   // compression (m) where stop engages
+    public float bumpStopK = 150000f;     // extra N/m once engaged
 
     [Header("Anti-roll bar")]
     public float arbStiffness = 22000f;   // N/m of roll-induced deflection
 
     [Header("Heave spring (3rd spring on axle)")]
     public float heaveK = 18000f;
-    public float heaveDamping = 3000f;
+    public float heaveDamping = 5000f;
 }
