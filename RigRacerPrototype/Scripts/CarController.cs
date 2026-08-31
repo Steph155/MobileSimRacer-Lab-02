@@ -106,7 +106,7 @@ public class CarController : MonoBehaviour
         springFreeLength = compEq + 0.15f; // tight free length (~0.20 m)
         float uprightHalf = (rig.fUpperLeftFrontMount.y - rig.fLowerLeftFrontMount.y) * 0.5f;
         // Equilibrium body height so the wheel rests exactly on the ground.
-        float bodyEq = -springTopLocalY + (springFreeLength - compEq) - uprightHalf + frontWheelRadius;
+        float bodyEq = -springTopLocalY + (springFreeLength - compEq) - uprightHalf + rig.frontWheelRadius;
         if (spawnPosition.y < bodyEq + 0.02f) spawnPosition.y = bodyEq + 0.06f;
 
         ResetToSpawn();
